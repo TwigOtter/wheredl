@@ -73,10 +73,17 @@ Random city pulled at runtime from the [World Cities FeatureServer](https://serv
 - Container `<div>` given a **fixed pixel size** (or fixed aspect-ratio + max-width), not a fluid one — this is what actually equalizes the view across devices, since an ultrawide monitor doesn't inherently reveal more area if the container itself doesn't grow.
 
 ### 5.2 Interaction MapView
-- Same basemap initially; candidate for a vector tile / labeled basemap swap, to be decided via playtesting (labels could make guessing too easy or could just make the UX less frustrating — worth testing both).
+- Esri's "Imagery Hybrid" web map (`86265e5a4bbb4187a59719cf134e0018`): World Imagery plus a reference layer carrying place labels. The goal view deliberately stays label-free.
+- Scale bar in the bottom-right corner.
+- Both of the above are **playtest options**, on by default and toggleable from an Options dialog (see §5.3). Playtesting said scale and landmark-finding were the primary pain points; leaving them switchable is how we find out whether the help is actually wanted.
 - Click handler -> guess point.
 - Graphic + label placed per guess showing distance only (no bearing).
 - Guess history persists visually across all 6 attempts within the round.
+
+### 5.3 Options
+- "Options" button in the actions row opens a modal dialog with a checkbox per helper (scale bar, place labels).
+- Both default to on. Choices are stored in `localStorage` so they survive the reload that "Give Me Another!" triggers.
+- The labels toggle flips the basemap's reference-layer visibility rather than swapping basemaps, so toggling mid-round can't disturb the view or the guess graphics.
 
 ---
 
@@ -137,6 +144,6 @@ On round completion:
 ## 10. Open Questions Before Build
 
 1. How is the daily city sequence actually curated/generated, and how far in advance is it committed?
-2. Interaction basemap: same as goal view, or swap to something with labels/roads for better UX? (Playtest)
+2. ~~Interaction basemap: same as goal view, or swap to something with labels/roads for better UX?~~ Now labelled hybrid imagery + a scale bar, both toggleable — playtest whether people leave them on.
 3. Exact scoring formula: log-based golf score vs. X/6 vs. revisit GeoGuessr-style decay. (Playtest)
 4. Share-text format/symbols for the clipboard result block.

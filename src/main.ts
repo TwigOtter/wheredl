@@ -1,6 +1,7 @@
 import "./style.css";
 
 import "@arcgis/map-components/components/arcgis-map";
+import "@arcgis/map-components/components/arcgis-scale-bar";
 import Basemap from "@arcgis/core/Basemap.js";
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer.js";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer.js";
@@ -13,6 +14,7 @@ import type Point from "@arcgis/core/geometry/Point.js";
 import type Extent from "@arcgis/core/geometry/Extent.js";
 import type { ArcgisMap } from "@arcgis/map-components/components/arcgis-map";
 import { cityObjectIdForDay, todaysDayIndex } from "./dailyCities";
+import { getOptions, initOptionsPanel, type GameOptions } from "./options";
 
 const WORLD_CITIES_URL =
   "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/World_Cities/FeatureServer/0";
@@ -41,8 +43,9 @@ interface City {
 const citiesLayer = new FeatureLayer({ url: WORLD_CITIES_URL });
 
 /**
- * A plain tile-service basemap, no ArcGIS item/API key required. Each view
- * needs its own Basemap/TileLayer instance rather than sharing one.
+ * A plain tile-service basemap, no ArcGIS item/API key required. Used by the
+ * goal view only — labels there would give the answer away outright, so it
+ * stays on bare imagery while the guess map uses the hybrid web map.
  */
 function createWorldImageryBasemap(): Basemap {
   return new Basemap({
@@ -99,6 +102,26 @@ function disableViewNavigation(view: MapView): void {
   view.on("double-click", stop);
   view.on("key-down", stop);
   view.popupEnabled = false;
+}
+
+/**
+ * The hybrid web map keeps its place labels in the basemap's reference
+ * layers, so the labels option is a visibility flip rather than a basemap
+ * swap — swapping would reload tiles and, more importantly, risk disturbing
+ * the view and the guess graphics mid-round.
+ */
+async function setBasemapLabelsVisible(
+  view: MapView,
+  visible: boolean,
+): Promise<void> {
+  const basemap = view.map?.basemap;
+  if (!basemap) return;
+
+  // referenceLayers is only populated once the basemap itself has loaded.
+  await basemap.load();
+  basemap.referenceLayers.forEach((layer) => {
+    layer.visible = visible;
+  });
 }
 
 /** Tap the goal view to blow it up to a larger overlay; tap again (or the backdrop) to shrink it back. */
@@ -284,6 +307,7 @@ async function main(): Promise<void> {
   const goalViewContainer = document.querySelector<HTMLElement>("#goal-view-container");
   const expandBackdrop = document.querySelector<HTMLElement>("#expand-backdrop");
   const interactionView = document.querySelector<ArcgisMap>("#interaction-view");
+  const scaleBar = document.querySelector<HTMLElement>("#interaction-scale-bar");
   const statusEl = document.querySelector<HTMLElement>("#round-status");
   const copyButton = document.querySelector<HTMLButtonElement>("#copy-results");
   const giveAnotherButton = document.querySelector<HTMLButtonElement>("#give-another");
@@ -293,6 +317,7 @@ async function main(): Promise<void> {
     !goalViewContainer ||
     !expandBackdrop ||
     !interactionView ||
+    !scaleBar ||
     !statusEl ||
     !copyButton ||
     !giveAnotherButton
@@ -300,9 +325,20 @@ async function main(): Promise<void> {
     throw new Error("Required DOM elements not found");
   }
 
+  // The interaction view's basemap comes from the hybrid web map item set in
+  // index.html, so only the goal view needs one built here.
   goalView.basemap = createWorldImageryBasemap();
-  interactionView.basemap = createWorldImageryBasemap();
   initGoalViewExpand(goalViewContainer, expandBackdrop);
+
+  const applyOptions = (options: GameOptions): void => {
+    scaleBar.hidden = !options.scaleBar;
+    if (interactionView.ready) {
+      void setBasemapLabelsVisible(interactionView.view, options.labels);
+    }
+  };
+
+  initOptionsPanel(applyOptions);
+  applyOptions(getOptions());
 
   giveAnotherButton.addEventListener("click", () => {
     const randomDayIndex = Math.floor(Math.random() * PLAYTEST_DAY_INDEX_RANGE);
@@ -324,10 +360,41 @@ async function main(): Promise<void> {
     disableViewNavigation(goalView.view);
   });
 
+  // If the web map item can't be fetched, fall back to the plain imagery
+  // basemap so the round is still playable — just without labels. Strictly
+  // one-shot: the event fires again for every layer that fails to load, so
+  // retrying would spin up a fresh basemap on each one.
+  let usedBasemapFallback = false;
+  interactionView.addEventListener("arcgisLoadError", () => {
+    if (usedBasemapFallback) return;
+    usedBasemapFallback = true;
+
+    console.warn(
+      "Hybrid web map failed to load, falling back to plain imagery",
+      interactionView.loadErrorSources,
+    );
+    interactionView.itemId = null;
+    interactionView.basemap = createWorldImageryBasemap();
+  });
+
   const guessesLayer = new GraphicsLayer();
+  let roundStarted = false;
 
   interactionView.addEventListener("arcgisViewReadyChange", async () => {
-    interactionView.view.map?.add(guessesLayer);
+    // Also fires on the ready -> not-ready transition.
+    if (!interactionView.ready) return;
+
+    // Re-checked on every ready transition rather than done once, so the
+    // guess history survives the load-error fallback rebuilding the map.
+    const map = interactionView.view.map;
+    if (map && !map.layers.includes(guessesLayer)) map.add(guessesLayer);
+
+    void setBasemapLabelsVisible(interactionView.view, getOptions().labels);
+
+    // The round itself is wired exactly once — a second pass would register
+    // a second click handler and double-count every guess.
+    if (roundStarted) return;
+    roundStarted = true;
 
     const city = await cityPromise;
     const round = new Round(city, dayIndex, guessesLayer, statusEl);

@@ -128,7 +128,9 @@ body {
 }
 
 #copy-results,
-#give-another {
+#give-another,
+#options-button,
+#options-close {
   padding: 0.6rem 1.2rem;
   border-radius: 8px;
   font-size: 1rem;
@@ -162,6 +164,79 @@ body {
 
 #give-another:active {
   background: rgba(255, 138, 61, 0.2);
+}
+
+#options-button {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+#options-button:hover {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+/* The scale bar sets no display of its own, so the `hidden` property alone
+   would work — !important just makes sure a future component stylesheet
+   can't quietly re-show it. */
+#interaction-scale-bar[hidden] {
+  display: none !important;
+}
+
+#options-dialog {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 1.25rem;
+  width: min(90vw, 22rem);
+  /* Modal dialogs render in the top layer, above the goal-view overlay. */
+  margin: auto;
+}
+
+#options-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+#options-dialog h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+}
+
+.options-hint {
+  margin: 0 0 1rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.option input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+#options-close {
+  margin-top: 1rem;
+  width: 100%;
+  border: none;
+  background: var(--accent);
+  color: #1a1005;
+}
+
+#options-close:hover {
+  filter: brightness(1.08);
 }
 
 @media (min-width: 900px) {
