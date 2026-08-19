@@ -12,17 +12,19 @@ import type MapView from "@arcgis/core/views/MapView.js";
 import type Point from "@arcgis/core/geometry/Point.js";
 import type Extent from "@arcgis/core/geometry/Extent.js";
 import type { ArcgisMap } from "@arcgis/map-components/components/arcgis-map";
+import { todaysCityObjectId, todaysDayIndex } from "./dailyCities";
 
 const WORLD_CITIES_URL =
   "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/World_Cities/FeatureServer/0";
 const WORLD_IMAGERY_URL =
   "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer";
-const POPULATION_THRESHOLD = 500_000;
 const BUFFER_RADIUS_KM = 5;
 const WIN_DISTANCE_KM = 20;
 const MAX_GUESSES = 10;
 const SCORE_CAP = 10;
+const SCORE_ROW_WIDTH = 5;
 const RED_SQUARE = "🟥";
+const YELLOW_SQUARE = "🟨";
 const GREEN_SQUARE = "🟩";
 
 interface City {
@@ -43,15 +45,9 @@ function createWorldImageryBasemap(): Basemap {
   });
 }
 
-async function pickRandomCity(): Promise<City> {
-  const objectIds = await citiesLayer.queryObjectIds({
-    where: `POP >= ${POPULATION_THRESHOLD}`,
-  });
-
-  const objectId = objectIds[Math.floor(Math.random() * objectIds.length)];
-
+async function pickTodaysCity(): Promise<City> {
   const { features } = await citiesLayer.queryFeatures({
-    objectIds: [objectId],
+    objectIds: [todaysCityObjectId()],
     returnGeometry: true,
     outFields: ["CITY_NAME", "CNTRY_NAME"],
   });
@@ -120,14 +116,20 @@ function scoreForDistance(distanceKm: number): number {
 }
 
 /**
- * Visual-only shorthand for a guess's score: red squares for points scored
- * (capped at SCORE_CAP), green squares filling the rest. A win (score null)
- * is all green.
+ * Visual-only shorthand for a guess's score, five squares wide: each red
+ * square is 2 points, a trailing yellow is 1 point, green fills the rest.
+ * A win (score null) is all green.
  */
 function scoreEmoji(score: number | null): string {
-  const redCount = score === null ? 0 : score;
-  const greenCount = SCORE_CAP - redCount;
-  return RED_SQUARE.repeat(redCount) + GREEN_SQUARE.repeat(greenCount);
+  const points = score ?? 0;
+  const redCount = Math.floor(points / 2);
+  const yellowCount = points % 2;
+  const greenCount = SCORE_ROW_WIDTH - redCount - yellowCount;
+  return (
+    RED_SQUARE.repeat(redCount) +
+    YELLOW_SQUARE.repeat(yellowCount) +
+    GREEN_SQUARE.repeat(greenCount)
+  );
 }
 
 interface Guess {
@@ -137,6 +139,7 @@ interface Guess {
 
 class Round {
   private readonly city: City;
+  private readonly dayIndex: number;
   private readonly guessesLayer: GraphicsLayer;
   private readonly guessListEl: HTMLElement;
   private readonly statusEl: HTMLElement;
@@ -146,11 +149,13 @@ class Round {
 
   constructor(
     city: City,
+    dayIndex: number,
     guessesLayer: GraphicsLayer,
     guessListEl: HTMLElement,
     statusEl: HTMLElement,
   ) {
     this.city = city;
+    this.dayIndex = dayIndex;
     this.guessesLayer = guessesLayer;
     this.guessListEl = guessListEl;
     this.statusEl = statusEl;
@@ -215,8 +220,7 @@ class Round {
 
   buildResultsText(): string {
     const lines = this.guesses.map((guess) => scoreEmoji(guess.score));
-    const scoreLine = this.won ? `Score: ${this.totalScore}` : `Score: ${this.totalScore} (X/${MAX_GUESSES})`;
-    return [...lines, scoreLine].join("\n");
+    return [`Wheredle ${this.dayIndex}`, `Score: ${this.totalScore}`, ...lines].join("\n");
   }
 
   private addGuessGraphic(point: Point, distanceKm: number): void {
@@ -287,7 +291,7 @@ async function main(): Promise<void> {
   interactionView.basemap = createWorldImageryBasemap();
   initGoalViewExpand(goalViewContainer, expandBackdrop);
 
-  const cityPromise = pickRandomCity().then((city) => {
+  const cityPromise = pickTodaysCity().then((city) => {
     console.log(`Today's city: ${city.name}`);
     return city;
   });
@@ -304,7 +308,7 @@ async function main(): Promise<void> {
     interactionView.view.map?.add(guessesLayer);
 
     const city = await cityPromise;
-    const round = new Round(city, guessesLayer, guessListEl, statusEl);
+    const round = new Round(city, todaysDayIndex(), guessesLayer, guessListEl, statusEl);
 
     interactionView.view.on("click", (event) => {
       if (round.isOver) return;
