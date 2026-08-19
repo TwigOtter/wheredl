@@ -66,7 +66,9 @@ export function todaysDayIndex(): number {
   return ((daysSinceEpoch % length) + length) % length;
 }
 
-/** Today's OBJECTID, advancing once per calendar day at midnight America/Chicago. */
-export function todaysCityObjectId(): number {
-  return DAILY_CITY_OBJECT_IDS[todaysDayIndex()];
+/** The OBJECTID for a given day index, wrapping once the list is exhausted. */
+export function cityObjectIdForDay(dayIndex: number): number {
+  const length = DAILY_CITY_OBJECT_IDS.length;
+  const normalized = ((dayIndex % length) + length) % length;
+  return DAILY_CITY_OBJECT_IDS[normalized];
 }

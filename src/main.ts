@@ -12,7 +12,7 @@ import type MapView from "@arcgis/core/views/MapView.js";
 import type Point from "@arcgis/core/geometry/Point.js";
 import type Extent from "@arcgis/core/geometry/Extent.js";
 import type { ArcgisMap } from "@arcgis/map-components/components/arcgis-map";
-import { todaysCityObjectId, todaysDayIndex } from "./dailyCities";
+import { cityObjectIdForDay, todaysDayIndex } from "./dailyCities";
 
 const WORLD_CITIES_URL =
   "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/World_Cities/FeatureServer/0";
@@ -26,6 +26,12 @@ const SCORE_ROW_WIDTH = 5;
 const RED_SQUARE = "🟥";
 const YELLOW_SQUARE = "🟨";
 const GREEN_SQUARE = "🟩";
+const SCORE_OUT_OF = SCORE_CAP * MAX_GUESSES;
+
+// Playtest-only: "Give Me Another!" picks a random day index in this range
+// and stashes it here so a page reload picks it up instead of today's city.
+const PLAYTEST_DAY_INDEX_RANGE = 500;
+const PLAYTEST_DAY_INDEX_KEY = "wheredl-playtest-day-index";
 
 interface City {
   point: Point;
@@ -45,9 +51,9 @@ function createWorldImageryBasemap(): Basemap {
   });
 }
 
-async function pickTodaysCity(): Promise<City> {
+async function pickCityForDay(dayIndex: number): Promise<City> {
   const { features } = await citiesLayer.queryFeatures({
-    objectIds: [todaysCityObjectId()],
+    objectIds: [cityObjectIdForDay(dayIndex)],
     returnGeometry: true,
     outFields: ["CITY_NAME", "CNTRY_NAME"],
   });
@@ -141,7 +147,6 @@ class Round {
   private readonly city: City;
   private readonly dayIndex: number;
   private readonly guessesLayer: GraphicsLayer;
-  private readonly guessListEl: HTMLElement;
   private readonly statusEl: HTMLElement;
   private readonly guesses: Guess[] = [];
   private won = false;
@@ -151,13 +156,11 @@ class Round {
     city: City,
     dayIndex: number,
     guessesLayer: GraphicsLayer,
-    guessListEl: HTMLElement,
     statusEl: HTMLElement,
   ) {
     this.city = city;
     this.dayIndex = dayIndex;
     this.guessesLayer = guessesLayer;
-    this.guessListEl = guessListEl;
     this.statusEl = statusEl;
     this.updateStatus();
   }
@@ -166,8 +169,14 @@ class Round {
     return this.won || this.guesses.length >= MAX_GUESSES;
   }
 
+  /** Sum of capped per-guess penalties, 0 (best) to SCORE_OUT_OF (worst). */
   get totalScore(): number {
     return this.guesses.reduce((sum, guess) => sum + (guess.score ?? 0), 0);
+  }
+
+  /** Player-facing score, SCORE_OUT_OF (best) down to 0 (worst) — higher is better. */
+  get displayScore(): number {
+    return SCORE_OUT_OF - this.totalScore;
   }
 
   async submitGuess(point: Point): Promise<void> {
@@ -181,7 +190,6 @@ class Round {
     this.guesses.push({ distanceKm, score });
 
     this.addGuessGraphic(point, distanceKm);
-    this.addGuessRow(score);
     this.updateStatus();
   }
 
@@ -220,7 +228,11 @@ class Round {
 
   buildResultsText(): string {
     const lines = this.guesses.map((guess) => scoreEmoji(guess.score));
-    return [`Wheredle ${this.dayIndex}`, `Score: ${this.totalScore}`, ...lines].join("\n");
+    return [
+      `Wheredl ${this.dayIndex}`,
+      `Score: ${this.displayScore}/${SCORE_OUT_OF}`,
+      ...lines,
+    ].join("\n");
   }
 
   private addGuessGraphic(point: Point, distanceKm: number): void {
@@ -248,41 +260,42 @@ class Round {
     ]);
   }
 
-  private addGuessRow(score: number | null): void {
-    const row = document.createElement("div");
-    row.className = "guess-row";
-    row.textContent = scoreEmoji(score);
-    this.guessListEl.appendChild(row);
-  }
-
   private updateStatus(): void {
     const guessCount = this.guesses.length;
     if (this.won) {
-      this.statusEl.textContent = `You found ${this.city.name} in ${guessCount}/${MAX_GUESSES} guesses! Score: ${this.totalScore}`;
+      this.statusEl.textContent = `You found ${this.city.name} in ${guessCount}/${MAX_GUESSES} guesses! Score: ${this.displayScore}/${SCORE_OUT_OF}`;
     } else if (guessCount >= MAX_GUESSES) {
-      this.statusEl.textContent = `Out of guesses. It was ${this.city.name}. Score: ${this.totalScore}`;
+      this.statusEl.textContent = `Out of guesses. It was ${this.city.name}. Score: ${this.displayScore}/${SCORE_OUT_OF}`;
     } else {
       this.statusEl.textContent = `${MAX_GUESSES - guessCount} guesses remaining.`;
     }
   }
 }
 
+/** The real day index, unless a playtest override was stashed by "Give Me Another!". */
+function resolveDayIndex(): number {
+  const override = sessionStorage.getItem(PLAYTEST_DAY_INDEX_KEY);
+  return override !== null ? Number(override) : todaysDayIndex();
+}
+
 async function main(): Promise<void> {
+  const titleEl = document.querySelector<HTMLElement>("#title");
   const goalView = document.querySelector<ArcgisMap>("#goal-view");
   const goalViewContainer = document.querySelector<HTMLElement>("#goal-view-container");
   const expandBackdrop = document.querySelector<HTMLElement>("#expand-backdrop");
   const interactionView = document.querySelector<ArcgisMap>("#interaction-view");
-  const guessListEl = document.querySelector<HTMLElement>("#guess-list");
   const statusEl = document.querySelector<HTMLElement>("#round-status");
   const copyButton = document.querySelector<HTMLButtonElement>("#copy-results");
+  const giveAnotherButton = document.querySelector<HTMLButtonElement>("#give-another");
   if (
+    !titleEl ||
     !goalView ||
     !goalViewContainer ||
     !expandBackdrop ||
     !interactionView ||
-    !guessListEl ||
     !statusEl ||
-    !copyButton
+    !copyButton ||
+    !giveAnotherButton
   ) {
     throw new Error("Required DOM elements not found");
   }
@@ -291,7 +304,16 @@ async function main(): Promise<void> {
   interactionView.basemap = createWorldImageryBasemap();
   initGoalViewExpand(goalViewContainer, expandBackdrop);
 
-  const cityPromise = pickTodaysCity().then((city) => {
+  giveAnotherButton.addEventListener("click", () => {
+    const randomDayIndex = Math.floor(Math.random() * PLAYTEST_DAY_INDEX_RANGE);
+    sessionStorage.setItem(PLAYTEST_DAY_INDEX_KEY, String(randomDayIndex));
+    location.reload();
+  });
+
+  const dayIndex = resolveDayIndex();
+  titleEl.textContent = `Wheredl #${dayIndex}`;
+
+  const cityPromise = pickCityForDay(dayIndex).then((city) => {
     console.log(`Today's city: ${city.name}`);
     return city;
   });
@@ -308,7 +330,7 @@ async function main(): Promise<void> {
     interactionView.view.map?.add(guessesLayer);
 
     const city = await cityPromise;
-    const round = new Round(city, todaysDayIndex(), guessesLayer, guessListEl, statusEl);
+    const round = new Round(city, dayIndex, guessesLayer, statusEl);
 
     interactionView.view.on("click", (event) => {
       if (round.isOver) return;

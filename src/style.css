@@ -110,7 +110,6 @@ body {
 
 #guess-list-container {
   grid-area: list;
-  container-type: inline-size;
   padding: 1rem;
   display: flex;
   flex-direction: column;
@@ -122,30 +121,25 @@ body {
   font-weight: 600;
 }
 
-#guess-list {
+#actions {
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.guess-row {
-  /* Ten emoji squares sized off this container's actual width (not the
-     viewport's) so a row never wraps, however narrow the column is. */
-  font-size: clamp(0.85rem, 9cqw, 1.6rem);
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-#copy-results {
-  align-self: flex-start;
+#copy-results,
+#give-another {
   padding: 0.6rem 1.2rem;
-  border: none;
   border-radius: 8px;
-  background: var(--accent);
-  color: #1a1005;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+#copy-results {
+  border: none;
+  background: var(--accent);
+  color: #1a1005;
 }
 
 #copy-results:hover {
@@ -154,6 +148,20 @@ body {
 
 #copy-results:active {
   filter: brightness(0.95);
+}
+
+#give-another {
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+}
+
+#give-another:hover {
+  background: rgba(255, 138, 61, 0.1);
+}
+
+#give-another:active {
+  background: rgba(255, 138, 61, 0.2);
 }
 
 @media (min-width: 900px) {
