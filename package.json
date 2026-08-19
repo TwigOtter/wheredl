@@ -1,0 +1,20 @@
+{
+  "name": "wheredl",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0"
+  },
+  "dependencies": {
+    "@arcgis/core": "^5.1.17",
+    "@arcgis/map-components": "^5.1.17",
+    "@esri/calcite-components": "^5.1.2"
+  }
+}

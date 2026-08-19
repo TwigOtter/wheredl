@@ -1,0 +1,168 @@
+@import "@arcgis/core/assets/esri/themes/dark/main.css";
+
+:root {
+  --bg: #10151c;
+  --surface: #1b232e;
+  --border: #2c3644;
+  --text: #eef2f6;
+  --text-muted: #9aa7b5;
+  --accent: #ff8a3d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+#app {
+  display: grid;
+  gap: 1rem;
+  padding: 0.75rem;
+  width: 100%;
+  max-width: 1400px;
+  margin-inline: auto;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "title title"
+    "goal list"
+    "interaction interaction";
+}
+
+#title {
+  grid-area: title;
+  margin: 0.25rem 0;
+  text-align: center;
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  letter-spacing: 0.02em;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+#goal-view-container {
+  grid-area: goal;
+  /* Fixed pixel size so the "10km square" reads as the same real-world
+     size on every device, regardless of viewport width. */
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 1;
+  margin-inline: auto;
+  cursor: zoom-in;
+}
+
+#goal-view-container.expanded {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(92vw, 92vh, 640px);
+  max-width: none;
+  aspect-ratio: 1;
+  z-index: 1001;
+  cursor: zoom-out;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+#expand-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 1000;
+}
+
+#expand-backdrop.visible {
+  display: block;
+}
+
+#interaction-view-container {
+  grid-area: interaction;
+  /* Aspect-ratio (not a fixed px height) so this stays reasonably sized on
+     narrow phone viewports instead of forcing a huge scroll on mobile. */
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+#goal-view-container arcgis-map,
+#interaction-view-container arcgis-map {
+  width: 100%;
+  height: 100%;
+}
+
+#guess-list-container {
+  grid-area: list;
+  container-type: inline-size;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+#round-status {
+  margin: 0;
+  font-weight: 600;
+}
+
+#guess-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.guess-row {
+  /* Ten emoji squares sized off this container's actual width (not the
+     viewport's) so a row never wraps, however narrow the column is. */
+  font-size: clamp(0.85rem, 9cqw, 1.6rem);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+#copy-results {
+  align-self: flex-start;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #1a1005;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#copy-results:hover {
+  filter: brightness(1.08);
+}
+
+#copy-results:active {
+  filter: brightness(0.95);
+}
+
+@media (min-width: 900px) {
+  #app {
+    grid-template-columns: 480px 1fr;
+    grid-template-areas:
+      "title title"
+      "goal interaction"
+      "list interaction";
+    align-items: start;
+  }
+}

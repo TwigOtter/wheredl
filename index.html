@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wheredl</title>
+  </head>
+<body>
+  <div id="app">
+    <h1 id="title">Wheredl</h1>
+
+    <div id="goal-view-container" class="panel">
+      <arcgis-map id="goal-view"></arcgis-map>
+    </div>
+
+    <div id="interaction-view-container" class="panel">
+      <arcgis-map id="interaction-view"></arcgis-map>
+    </div>
+
+    <div id="guess-list-container" class="panel">
+      <p id="round-status">Loading today's city…</p>
+      <div id="guess-list"></div>
+      <button id="copy-results" type="button" hidden>Copy Results</button>
+    </div>
+  </div>
+  <div id="expand-backdrop"></div>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
