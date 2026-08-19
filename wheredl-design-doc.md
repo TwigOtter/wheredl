@@ -77,7 +77,7 @@ Random city pulled at runtime from the [World Cities FeatureServer](https://serv
 - Scale bar in the bottom-right corner.
 - Both of the above are **playtest options**, on by default and toggleable from an Options dialog (see §5.3). Playtesting said scale and landmark-finding were the primary pain points; leaving them switchable is how we find out whether the help is actually wanted.
 - Click handler -> guess point.
-- Graphic + label placed per guess showing distance only (no bearing).
+- Graphic + label placed per guess showing distance only (no bearing). These live in the **view's graphics collection**, not a `GraphicsLayer` — the basemap's reference layer (place labels) draws above every layer in the map, so guess markers in a `GraphicsLayer` get buried under the labels.
 - Guess history persists visually across all 6 attempts within the round.
 
 ### 5.3 Options

@@ -4,11 +4,11 @@ import "@arcgis/map-components/components/arcgis-map";
 import "@arcgis/map-components/components/arcgis-scale-bar";
 import Basemap from "@arcgis/core/Basemap.js";
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer.js";
-import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer.js";
 import TileLayer from "@arcgis/core/layers/TileLayer.js";
 import Graphic from "@arcgis/core/Graphic.js";
 import * as geodesicBufferOperator from "@arcgis/core/geometry/operators/geodesicBufferOperator.js";
 import * as geodeticDistanceOperator from "@arcgis/core/geometry/operators/geodeticDistanceOperator.js";
+import type Collection from "@arcgis/core/core/Collection.js";
 import type MapView from "@arcgis/core/views/MapView.js";
 import type Point from "@arcgis/core/geometry/Point.js";
 import type Extent from "@arcgis/core/geometry/Extent.js";
@@ -107,8 +107,7 @@ function disableViewNavigation(view: MapView): void {
 /**
  * The hybrid web map keeps its place labels in the basemap's reference
  * layers, so the labels option is a visibility flip rather than a basemap
- * swap — swapping would reload tiles and, more importantly, risk disturbing
- * the view and the guess graphics mid-round.
+ * swap — swapping would reload tiles and jolt the view mid-round.
  */
 async function setBasemapLabelsVisible(
   view: MapView,
@@ -169,7 +168,7 @@ interface Guess {
 class Round {
   private readonly city: City;
   private readonly dayIndex: number;
-  private readonly guessesLayer: GraphicsLayer;
+  private readonly guessGraphics: Collection<Graphic>;
   private readonly statusEl: HTMLElement;
   private readonly guesses: Guess[] = [];
   private won = false;
@@ -178,12 +177,12 @@ class Round {
   constructor(
     city: City,
     dayIndex: number,
-    guessesLayer: GraphicsLayer,
+    guessGraphics: Collection<Graphic>,
     statusEl: HTMLElement,
   ) {
     this.city = city;
     this.dayIndex = dayIndex;
-    this.guessesLayer = guessesLayer;
+    this.guessGraphics = guessGraphics;
     this.statusEl = statusEl;
     this.updateStatus();
   }
@@ -221,7 +220,7 @@ class Round {
     if (this.revealed) return;
     this.revealed = true;
 
-    this.guessesLayer.addMany([
+    this.guessGraphics.addMany([
       new Graphic({
         geometry: this.city.point,
         symbol: {
@@ -259,7 +258,7 @@ class Round {
   }
 
   private addGuessGraphic(point: Point, distanceKm: number): void {
-    this.guessesLayer.addMany([
+    this.guessGraphics.addMany([
       new Graphic({
         geometry: point,
         symbol: {
@@ -377,17 +376,11 @@ async function main(): Promise<void> {
     interactionView.basemap = createWorldImageryBasemap();
   });
 
-  const guessesLayer = new GraphicsLayer();
   let roundStarted = false;
 
   interactionView.addEventListener("arcgisViewReadyChange", async () => {
     // Also fires on the ready -> not-ready transition.
     if (!interactionView.ready) return;
-
-    // Re-checked on every ready transition rather than done once, so the
-    // guess history survives the load-error fallback rebuilding the map.
-    const map = interactionView.view.map;
-    if (map && !map.layers.includes(guessesLayer)) map.add(guessesLayer);
 
     void setBasemapLabelsVisible(interactionView.view, getOptions().labels);
 
@@ -397,7 +390,12 @@ async function main(): Promise<void> {
     roundStarted = true;
 
     const city = await cityPromise;
-    const round = new Round(city, dayIndex, guessesLayer, statusEl);
+    // Guesses go in the view's graphics collection rather than a
+    // GraphicsLayer: the basemap's reference layer (place labels) draws above
+    // every layer in the map, so a GraphicsLayer's markers end up buried under
+    // the labels. This collection sits above all of it, and belongs to the
+    // view rather than the map, so a basemap swap can't disturb it.
+    const round = new Round(city, dayIndex, interactionView.graphics, statusEl);
 
     interactionView.view.on("click", (event) => {
       if (round.isOver) return;
