@@ -14,8 +14,20 @@
       <arcgis-map id="goal-view"></arcgis-map>
     </div>
 
+    <!-- item-id is Esri's "Imagery Hybrid" web map: World Imagery plus a
+         reference layer carrying place labels, which the labels option
+         toggles. The goal view deliberately stays label-free. -->
     <div id="interaction-view-container" class="panel">
-      <arcgis-map id="interaction-view"></arcgis-map>
+      <arcgis-map
+        id="interaction-view"
+        item-id="86265e5a4bbb4187a59719cf134e0018"
+      >
+        <arcgis-scale-bar
+          id="interaction-scale-bar"
+          slot="bottom-right"
+          unit="dual"
+        ></arcgis-scale-bar>
+      </arcgis-map>
     </div>
 
     <div id="guess-list-container" class="panel">
@@ -23,10 +35,26 @@
       <div id="actions">
         <button id="copy-results" type="button" hidden>Copy Results</button>
         <button id="give-another" type="button">Give Me Another! (playtest)</button>
+        <button id="options-button" type="button">Options</button>
       </div>
     </div>
   </div>
   <div id="expand-backdrop"></div>
+
+  <dialog id="options-dialog">
+    <h2>Options</h2>
+    <p class="options-hint">Playtest helpers for the guess map. Your choices stick between rounds.</p>
+    <label class="option">
+      <input id="option-scale-bar" type="checkbox" />
+      <span>Scale bar</span>
+    </label>
+    <label class="option">
+      <input id="option-labels" type="checkbox" />
+      <span>Place labels</span>
+    </label>
+    <button id="options-close" type="button">Done</button>
+  </dialog>
+
   <script type="module" src="./src/main.ts"></script>
 </body>
 </html>
